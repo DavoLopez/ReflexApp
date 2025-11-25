@@ -1,0 +1,1053 @@
+import { ChangeDetectionStrategy, Component, computed, signal, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+
+// --- NUEVOS DATOS MOCK DE REFLEXOLOGÍA AMPLIADOS (115 DOLENCIAS) ---
+// Estructuras de datos para simular el conocimiento de la app
+interface Ailment {
+  name: string;
+  description: string;
+  treatmentRoute: string; // Descripción de la ruta de tratamiento reflexológico
+}
+
+interface ReflexPoint {
+  zoneName: string; // Nombre de la zona a mostrar en la lista
+  reflexLocation: string; // Ubicación del punto reflejo en el pie (Ej: "Punta del dedo gordo")
+  footSide: 'left' | 'right' | 'both'; // Lado del pie donde se encuentra
+  ailments: Ailment[]; // Dolencias que ayuda a aliviar
+  zoneColor: string; // Color de zona, ahora solo decorativo o informativo
+}
+
+// Datos de ejemplo EXPANDIDOS para los puntos reflejos
+const reflexologyData: ReflexPoint[] = [
+  // --- ZONAS DE LA CABEZA Y SISTEMA NERVIOSO (Bilateral) ---
+  { zoneName: 'Cerebro y Cabeza', reflexLocation: 'Punta del dedo gordo, almohadilla superior.', footSide: 'both', zoneColor: '#FF6F61', ailments: [
+    { name: 'Cefalea Tensional', description: 'Ayuda a reducir el dolor de cabeza causado por el estrés.' },
+    { name: 'Insomnio Crónico', description: 'Estimulación suave para inducir la relajación y mejorar la calidad del sueño.' },
+    { name: 'Migraña', description: 'Ayuda a aliviar la intensidad y frecuencia de las migrañas.' },
+    { name: 'Niebla Mental / Falta de Concentración', description: 'Mejora la claridad mental y el flujo sanguíneo cerebral.' },
+    { name: 'Vértigo y Mareos', description: 'Estimulación para el equilibrio del sistema nervioso central.' },
+    { name: 'Párkinson (Soporte)', description: 'Estimulación del sistema nervioso para mejorar el control motor (terapia complementaria).' }, // +1
+  ] },
+  { zoneName: 'Senos Paranasales', reflexLocation: 'Punta de los dedos (bajo las uñas).', footSide: 'both', zoneColor: '#FF6F61', ailments: [
+    { name: 'Sinusitis', description: 'Ayuda a aliviar la congestión y la presión de los senos nasales.' },
+    { name: 'Rinitis Alérgica', description: 'Soporte para reducir la inflamación y secreción nasal.' },
+    { name: 'Congestión Facial', description: 'Drenaje para aliviar la sensación de pesadez en la cara.' },
+  ] },
+  { zoneName: 'Ojos (Reflejo Profundo)', reflexLocation: 'Base de los dedos 2 y 3, almohadilla.', footSide: 'both', zoneColor: '#FF6F61', ailments: [
+    { name: 'Fatiga Visual / Ojo Seco', description: 'Alivia el cansancio y la tensión alrededor de los ojos.' },
+    { name: 'Glaucoma (Soporte)', description: 'Ayuda a la circulación en el área ocular (complementario).' },
+    { name: 'Visión Borrosa por Estrés', description: 'Relajación de los nervios ópticos.' },
+    { name: 'Conjuntivitis (Soporte)', description: 'Ayuda a reducir la inflamación y la irritación ocular (complementario).' }, // +1
+  ] },
+  { zoneName: 'Oídos (Reflejo)', reflexLocation: 'Base de los dedos 4 y 5, almohadilla.', footSide: 'both', zoneColor: '#FF6F61', ailments: [
+    { name: 'Tinnitus (Zumbidos)', description: 'Ayuda a mejorar la circulación en el área del oído interno.' },
+    { name: 'Otitis (Dolor de Oído)', description: 'Soporte para reducir la inflamación y el dolor.' },
+    { name: 'Equilibrio (Mareo)', description: 'Punto clave para el sistema vestibular y el equilibrio.' },
+    { name: 'Síndrome de Meniere (Soporte)', description: 'Equilibrio del flujo linfático y nervioso del oído interno (complementario).' }, // +1
+  ] },
+
+  // --- SISTEMA ENDOCRINO (Bilateral) ---
+  { zoneName: 'Glándula Pituitaria / Hipófisis', reflexLocation: 'Centro de la almohadilla del dedo gordo.', footSide: 'both', zoneColor: '#FF61A6', ailments: [
+    { name: 'Desequilibrio Hormonal General', description: 'Punto maestro para la regulación de todas las demás glándulas.' },
+    { name: 'Problemas de Crecimiento', description: 'Estimulación suave para el eje hormonal (en niños).' },
+    { name: 'Alteraciones del Metabolismo', description: 'Regulación del eje hipotálamo-hipófisis.' },
+  ] },
+  { zoneName: 'Glándula Tiroides', reflexLocation: 'Base del dedo gordo, bajo la articulación del cuello.', footSide: 'both', zoneColor: '#FF61A6', ailments: [
+    { name: 'Hipotiroidismo (Fatiga)', description: 'Estimula la producción hormonal de la tiroides.' },
+    { name: 'Hipertiroidismo (Nerviosismo)', description: 'Ayuda a calmar la hiperactividad glandular.' },
+    { name: 'Bocio y Nódulos (Soporte)', description: 'Soporte circulatorio en el área glandular.' },
+    { name: 'Tiroiditis de Hashimoto (Soporte)', description: 'Ayuda a modular la respuesta autoinmune (complementario).' }, // +1
+  ] },
+  { zoneName: 'Glándula Pineal', reflexLocation: 'Lado interior del dedo gordo, base.', footSide: 'both', zoneColor: '#FF61A6', ailments: [
+    { name: 'Regulación del Ciclo Sueño-Vigilia', description: 'Ayuda a regular los ciclos circadianos a través de la melatonina.' },
+    { name: 'Trastorno Afectivo Estacional', description: 'Soporte para el estado de ánimo y la luz.' },
+  ] },
+  { zoneName: 'Glándulas Suprarrenales', reflexLocation: 'Justo encima del punto reflejo del riñón.', footSide: 'both', zoneColor: '#FF61A6', ailments: [
+    { name: 'Fatiga Crónica por Estrés (Burnout)', description: 'Ayuda a reequilibrar la respuesta del cuerpo al estrés (cortisol).' },
+    { name: 'Baja Energía y Vitalidad', description: 'Estimulación para el impulso energético.' },
+    { name: 'Reacciones Alérgicas (Soporte)', description: 'Intervención indirecta en la respuesta inflamatoria.' },
+    { name: 'Hipotensión por Estrés', description: 'Ayuda a regular la presión arterial baja asociada a la fatiga adrenal.' }, // +1
+  ] },
+
+  // --- SISTEMA ESQUELÉTICO Y MUSCULAR (Bilateral - Borde Interno y Externo) ---
+  { zoneName: 'Columna Vertebral (General)', reflexLocation: 'Toda la línea del borde interior del pie, desde el dedo gordo hasta el talón.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Dolor de Espalda Indefinido', description: 'Relajación general de toda la musculatura paravertebral.' },
+    { name: 'Mala Postura', description: 'Soporte para la conciencia postural y la relajación de la tensión.' },
+    { name: 'Rigidez Matutina', description: 'Aumenta la flexibilidad y el flujo sanguíneo en la columna.' },
+    { name: 'Fibromialgia (Punto de Control)', description: 'Tratamiento general para el dolor crónico y los puntos sensibles.' }, // +1
+  ] },
+  { zoneName: 'Columna Cervical (Cuello)', reflexLocation: 'Base del dedo gordo, articulación.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Tortícolis', description: 'Alivia la rigidez y el espasmo en el cuello.' },
+    { name: 'Dolor Cervical Crónico', description: 'Ayuda a liberar la tensión acumulada en el cuello.' },
+    { name: 'Latigazo Cervical (Fase Crónica)', description: 'Mejora la movilidad y reduce el dolor residual.' },
+  ] },
+  { zoneName: 'Columna Dorsal (Pecho)', reflexLocation: 'Borde interior, desde el dedo gordo hasta el arco.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Dolor entre Escápulas', description: 'Alivia la tensión en la parte media de la espalda.' },
+    { name: 'Dificultad Respiratoria por Tensión', description: 'Relaja los músculos intercostales.' },
+  ] },
+  { zoneName: 'Columna Lumbar (Baja)', reflexLocation: 'Área del arco interior, antes del talón.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Lumbago Agudo (No inflamatorio)', description: 'Alivia el dolor y espasmo en la zona baja de la espalda.' },
+    { name: 'Hernia Discal (Soporte)', description: 'Reduce la inflamación alrededor del disco.' },
+    { name: 'Ciática (Inicio)', description: 'Estimulación del origen del nervio ciático.' },
+  ] },
+  { zoneName: 'Rodilla', reflexLocation: 'Área alrededor de la base del pie, bajo el tobillo.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Artritis / Artrosis de Rodilla', description: 'Alivio del dolor y la inflamación de la articulación.' },
+    { name: 'Tendinitis Rotuliana', description: 'Soporte para la reparación de tejidos y la reducción de la tensión.' },
+    { name: 'Dolor post-ejercicio', description: 'Acelera la recuperación muscular alrededor de la rodilla.' },
+    { name: 'Osteoporosis (Soporte)', description: 'Estimulación circulatoria para la salud ósea y la absorción de calcio.' }, // +1
+  ] },
+  { zoneName: 'Cadera', reflexLocation: 'Área del tobillo, lado exterior.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Dolor Articular de Cadera', description: 'Punto reflejo para la articulación de la cadera.' },
+    { name: 'Bursitis Trocantérica', description: 'Ayuda a reducir la inflamación de las bolsas sinoviales.' },
+  ] },
+
+  // --- SISTEMA DIGESTIVO Y EXCRETOR (Principalmente Bilateral, con excepciones) ---
+  { zoneName: 'Estómago', reflexLocation: 'Bajo la almohadilla, centro del pie.', footSide: 'both', zoneColor: '#88B04B', ailments: [
+    { name: 'Acidez Estomacal / Reflujo Leve', description: 'Ayuda a regular la secreción de ácidos gástricos.' },
+    { name: 'Indigestión', description: 'Estimula la función gástrica y el movimiento de alimentos.' },
+    { name: 'Gastroenteritis (Fase Recuperación)', description: 'Soporte para la mucosa gástrica irritada.' },
+    { name: 'Dispepsia Funcional', description: 'Ayuda a aliviar la sensación de plenitud y malestar sin causa orgánica.' }, // +1
+  ] },
+  { zoneName: 'Páncreas', reflexLocation: 'Debajo del estómago, centro del pie.', footSide: 'left', zoneColor: '#88B04B', ailments: [
+    { name: 'Problemas de Glucemia (Soporte)', description: 'Estimula el equilibrio de la insulina.' },
+    { name: 'Mala Absorción de Grasas', description: 'Soporte para la función exocrina.' },
+  ] },
+  { zoneName: 'Intestino Delgado', reflexLocation: 'Centro del pie, área del arco, debajo del plexo solar.', footSide: 'both', zoneColor: '#88B04B', ailments: [
+    { name: 'Mala Absorción / Hinchazón', description: 'Favorece la absorción de nutrientes y el movimiento intestinal.' },
+    { name: 'Gases y Meteorismo', description: 'Ayuda a expulsar el exceso de gases acumulados.' },
+    { name: 'Enfermedad Celíaca (Soporte)', description: 'Mejora la salud de la mucosa intestinal y la digestión (complementario).' }, // +1
+  ] },
+  { zoneName: 'Intestino Grueso (General)', reflexLocation: 'Marco alrededor del arco.', footSide: 'both', zoneColor: '#88B04B', ailments: [
+    { name: 'Colon Irritable (SII)', description: 'Relaja la tensión en el intestino grueso y reduce espasmos.' },
+    { name: 'Estreñimiento Crónico', description: 'Estimula el peristaltismo para promover la evacuación.' },
+    { name: 'Diarrea (Fase Crónica)', description: 'Ayuda a tonificar el intestino y mejorar la consistencia.' },
+    { name: 'Diverticulitis (Fase Asintomática)', description: 'Mejora el flujo sanguíneo y la desinflamación preventiva.' },
+    { name: 'Crohn/Colitis (Fase No Aguda)', description: 'Ayuda a reducir la inflamación crónica del intestino grueso (complementario).' }, // +1
+  ] },
+  { zoneName: 'Recto / Ano', reflexLocation: 'Borde interior del talón, inferior.', footSide: 'both', zoneColor: '#88B04B', ailments: [
+    { name: 'Hemorroides (Soporte)', description: 'Ayuda a la circulación en la zona pélvica y rectal.' },
+    { name: 'Evacuación Incompleta', description: 'Estimula el movimiento final del sistema digestivo.' },
+    { name: 'Fisura Anal (Soporte circulatorio)', description: 'Mejora el flujo sanguíneo para la curación de la zona anal.' }, // +1
+  ] },
+
+  // --- ÓRGANOS VITALES ESPECÍFICOS (Lateralidad) ---
+  { zoneName: 'Hígado', reflexLocation: 'Centro del pie, arco superior (pie derecho).', footSide: 'right', zoneColor: '#88B04B', ailments: [
+    { name: 'Desintoxicación / Post-medicación', description: 'Estimula la función hepática para procesar toxinas.' },
+    { name: 'Fatiga Hepática', description: 'Soporte para la regeneración y vitalidad del hígado.' },
+    { name: 'Ictericia (Leve)', description: 'Ayuda al flujo de bilis.' },
+    { name: 'Metabolismo de Grasas', description: 'Estimula la producción de bilis para el procesamiento de lípidos.' }, // +1
+  ] },
+  { zoneName: 'Vesícula Biliar', reflexLocation: 'Un punto dentro de la zona hepática.', footSide: 'right', zoneColor: '#88B04B', ailments: [
+    { name: 'Problemas de Digestión Grasa', description: 'Ayuda a la producción y flujo adecuado de bilis.' },
+    { name: 'Dolor de Vesícula (Post-comida)', description: 'Alivia la congestión en la vesícula.' },
+    { name: 'Disquinesia Biliar', description: 'Ayuda a regular el movimiento y vaciado de la vesícula biliar.' }, // +1
+  ] },
+  { zoneName: 'Bazo', reflexLocation: 'Área cóncava superior, pie izquierdo solamente.', footSide: 'left', zoneColor: '#6B5B95', ailments: [
+    { name: 'Inmunidad Baja / Post-Infección', description: 'Punto clave para el sistema linfático e inmunológico.' },
+    { name: 'Anemia Leve', description: 'Soporte en la producción y filtración de células sanguíneas.' },
+    { name: 'Trombocitopenia (Soporte)', description: 'Estimulación del bazo como órgano filtrador y productor de células sanguíneas.' }, // +1
+  ] },
+  { zoneName: 'Corazón', reflexLocation: 'Almohadilla, bajo el dedo gordo (sólo en pie izquierdo).', footSide: 'left', zoneColor: '#FF61A6', ailments: [
+    { name: 'Ansiedad / Palpitaciones Nerviosas', description: 'Punto clave para la relajación del sistema circulatorio (no médico).' },
+    { name: 'Mala Circulación Periférica', description: 'Mejora el flujo sanguíneo hacia los pies.' },
+    { name: 'Hipertensión Leve por Estrés', description: 'Ayuda a relajar el sistema cardiovascular.' },
+    { name: 'Taquicardia Sinusal (Nerviosa)', description: 'Ayuda a calmar el ritmo cardíaco acelerado debido a la ansiedad.' }, // +1
+  ] },
+
+  // --- SISTEMA RESPIRATORIO Y LINFÁTICO ---
+  { zoneName: 'Pulmones / Bronquios', reflexLocation: 'Toda la almohadilla bajo los dedos.', footSide: 'both', zoneColor: '#6B5B95', ailments: [
+    { name: 'Congestión Respiratoria', description: 'Mejora la capacidad respiratoria y ayuda a aliviar la tos.' },
+    { name: 'Asma (Fase No Aguda)', description: 'Ayuda a relajar los bronquios y facilitar la respiración.' },
+    { name: 'Bronquitis Crónica (Soporte)', description: 'Estimulación para la limpieza y drenaje pulmonar.' },
+    { name: 'Tos Persistente', description: 'Calma el reflejo de la tos estimulando la zona refleja.' },
+    { name: 'Alergias Respiratorias (Soporte)', description: 'Ayuda a desinflamar las vías respiratorias superiores.' }, // +1
+  ] },
+  { zoneName: 'Timo', reflexLocation: 'Parte superior del esternón (reflejo en el pie).', footSide: 'both', zoneColor: '#6B5B95', ailments: [
+    { name: 'Refuerzo Inmunológico', description: 'Estimula la glándula clave en la maduración de las células T.' },
+    { name: 'Alergias Estacionales', description: 'Ayuda a modular la respuesta inmunológica excesiva.' },
+  ] },
+  { zoneName: 'Ganglios Linfáticos (Abdominales)', reflexLocation: 'Área del arco interior.', footSide: 'both', zoneColor: '#6B5B95', ailments: [
+    { name: 'Hinchazón Abdominal / Linfedema', description: 'Drenaje linfático y ayuda a la desintoxicación.' },
+    { name: 'Retención de Líquidos Post-quirúrgica', description: 'Mejora la circulación y el drenaje.' },
+  ] },
+
+  // --- SISTEMA URINARIO Y REPRODUCTIVO ---
+  { zoneName: 'Riñón', reflexLocation: 'Parte central del pie, como un pequeño frijol.', footSide: 'both', zoneColor: '#FFC72C', ailments: [
+    { name: 'Retención de Líquidos / Edema', description: 'Estimula la función renal para la eliminación de desechos.' },
+    { name: 'Cálculos Renales (Fase No Obstructiva)', description: 'Ayuda a aumentar el flujo para la expulsión de cristales.' },
+    { name: 'Cansancio Adrenal', description: 'Conexión con la energía vital y la función renal.' },
+    { name: 'Insuficiencia Renal Crónica (Soporte)', description: 'Estimulación suave para mejorar la diuresis y filtración (siempre con autorización médica).' }, // +1
+  ] },
+  { zoneName: 'Vejiga Urinaria', reflexLocation: 'Parte interior del arco, justo encima del talón.', footSide: 'both', zoneColor: '#FFC72C', ailments: [
+    { name: 'Infecciones Urinarias (Cistitis)', description: 'Estimula la función de la vejiga y ayuda a la eliminación de bacterias.' },
+    { name: 'Incontinencia Urinaria (Soporte)', description: 'Fortalece la función muscular de la vejiga.' },
+    { name: 'Vejiga Hiperactiva', description: 'Relaja los músculos de la vejiga para reducir la urgencia.' },
+    { name: 'Enuresis Nocturna (Soporte)', description: 'Fortalecimiento del control muscular de la vejiga para niños y adultos.' }, // +1
+  ] },
+  { zoneName: 'Ovarios / Testículos', reflexLocation: 'Punto del talón, lado exterior (pie izquierdo: ovario/testículo izquierdo; pie derecho: ovario/testículo derecho).', footSide: 'both', zoneColor: '#FF61A6', ailments: [
+    { name: 'Cólicos Menstruales (Dismenorrea)', description: 'Alivio del dolor y relajación de la musculatura pélvica.' },
+    { name: 'Irregularidades Menstruales', description: 'Ayuda a equilibrar el ciclo hormonal.' },
+    { name: 'Síntomas de Menopausia (Sofocos)', description: 'Soporte para el equilibrio hormonal durante el climaterio.' },
+    { name: 'Dolor Prostático (Soporte)', description: 'Mejora la circulación en la zona de la próstata.' },
+    { name: 'Síndrome de Ovario Poliquístico (SOP)', description: 'Ayuda a equilibrar el eje hormonal y reducir los síntomas (complementario).' }, // +1
+  ] },
+  { zoneName: 'Útero / Próstata', reflexLocation: 'Parte interna del tobillo, sobre el talón.', footSide: 'both', zoneColor: '#FF61A6', ailments: [
+    { name: 'Endometriosis (Dolor)', description: 'Ayuda a reducir la inflamación y el dolor pélvico.' },
+    { name: 'Hiperplasia Prostática Benigna (Soporte)', description: 'Mejora el flujo urinario y reduce la congestión.' },
+    { name: 'Fibromas Uterinos (Soporte)', description: 'Mejora la circulación en el útero.' },
+  ] },
+  
+  // --- ZONAS ADICIONALES Y SISTEMA NERVIOSO SIMPÁTICO ---
+  { zoneName: 'Plexo Solar (Relajación)', reflexLocation: 'Debajo de la almohadilla, punto central hueco.', footSide: 'both', zoneColor: '#FFC72C', ailments: [
+    { name: 'Estrés Severo / Ataques de Pánico', description: 'Punto de relajación profunda para el sistema nervioso.' },
+    { name: 'Ansiedad Generalizada', description: 'Calma el sistema nervioso simpático.' },
+    { name: 'Hipo Persistente', description: 'Relaja el diafragma y termina los espasmos.' },
+    { name: 'Tensión Muscular General', description: 'Punto central para liberar la tensión corporal.' },
+  ] },
+  { zoneName: 'Diafragma', reflexLocation: 'Línea que divide la almohadilla y el arco.', footSide: 'both', zoneColor: '#FFC72C', ailments: [
+    { name: 'Espasmos del Diafragma', description: 'Alivia la tensión en el músculo respiratorio.' },
+    { name: 'Respiración Superficial', description: 'Promueve la respiración profunda y completa.' },
+  ] },
+  { zoneName: 'Brazos y Codos', reflexLocation: 'Lado exterior del pie, debajo de los dedos 4 y 5.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Dolor de Codo (Codo de Tenista/Golfista)', description: 'Alivia la inflamación de los tendones del codo.' },
+    { name: 'Tensión en el Antebrazo', description: 'Relajación de los músculos flexores y extensores.' },
+  ] },
+  { zoneName: 'Muñeca y Manos', reflexLocation: 'Borde externo del pie, bajo el tobillo.', footSide: 'both', zoneColor: '#00B0AD', ailments: [
+    { name: 'Síndrome del Túnel Carpiano (Soporte)', description: 'Alivia la presión nerviosa en la muñeca.' },
+    { name: 'Artritis en Manos', description: 'Mejora la circulación y reduce la inflamación articular.' },
+  ] },
+];
+
+// Recopilación y ordenación de todas las dolencias para el Temario
+const allAilments: { name: string; description: string; treatmentRoute: string }[] = reflexologyData.flatMap(point => 
+  point.ailments.map(a => ({
+    name: a.name,
+    description: a.description,
+    treatmentRoute: `(Asociado a la zona de ${point.zoneName}, Pie: ${point.footSide === 'both' ? 'Ambos' : point.footSide === 'left' ? 'Izquierdo' : 'Derecho'}). ${a.treatmentRoute || ''}`,
+  }))
+);
+
+// --- DATA PARA LA PANTALLA HERBOLARIO (HERBOLARIA) ---
+interface Herb {
+  commonName: string;
+  scientificName: string;
+  ailments: string[]; // Listado de afecciones que trata
+  preparation: string; // Forma segura de preparación
+}
+
+const herbalData: Herb[] = [
+  { commonName: 'Lavanda', scientificName: 'Lavandula angustifolia', ailments: ['Estrés', 'Insomnio', 'Dolor muscular'], preparation: 'Aceite esencial diluido en aceite portador (almendras/oliva) para masaje podal.' },
+  { commonName: 'Manzanilla', scientificName: 'Matricaria recutita', ailments: ['Ansiedad', 'Problemas digestivos', 'Inflamación'], preparation: 'Infusión (una cucharadita de flores por taza, 5 min). Compresa para pies hinchados.' },
+  { commonName: 'Jengibre', scientificName: 'Zingiber officinale', ailments: ['Mala circulación', 'Náuseas', 'Dolor articular'], preparation: 'Infusión de raíz fresca (rodajas hervidas). Compresas calientes para pies fríos.' },
+  { commonName: 'Menta', scientificName: 'Mentha piperita', ailments: ['Dolores de cabeza', 'Congestión nasal', 'Fatiga'], preparation: 'Inhalación de aceite esencial o infusión. Baños de pies refrescantes con hojas trituradas.' },
+  { commonName: 'Eucalipto', scientificName: 'Eucalyptus globulus', ailments: ['Problemas respiratorios', 'Dolor articular', 'Sinusitis'], preparation: 'Aceite esencial diluido para masaje en zonas reflejas pulmonares. Vaporización.' },
+  { commonName: 'Árnica', scientificName: 'Arnica montana', ailments: ['Golpes', 'Moretones', 'Dolor muscular'], preparation: 'Pomada o gel de uso tópico. NUNCA ingerir, es tóxica.' },
+  { commonName: 'Caléndula', scientificName: 'Calendula officinalis', ailments: ['Irritación de la piel', 'Cicatrización', 'Inflamación'], preparation: 'Infusión para lavar zonas irritadas. Pomada tópica.' },
+  { commonName: 'Harpagofito', scientificName: 'Harpagophytum procumbens', ailments: ['Artritis', 'Dolor lumbar', 'Inflamación'], preparation: 'Cápsulas o tabletas (seguir dosis recomendada). Decocción de la raíz.' },
+  { commonName: 'Valeriana', scientificName: 'Valeriana officinalis', ailments: ['Insomnio', 'Nerviosismo', 'Ansiedad'], preparation: 'Infusión de raíz (máximo 5 minutos). Extracto líquido o cápsulas antes de dormir.' },
+  { commonName: 'Tila', scientificName: 'Tilia platyphyllos', ailments: ['Ansiedad', 'Estrés', 'Palpitaciones nerviosas'], preparation: 'Infusión de flores secas (5-10 minutos). Uso en baños relajantes.' },
+  { commonName: 'Hipérico (Hierba de San Juan)', scientificName: 'Hypericum perforatum', ailments: ['Depresión leve', 'Dolor neuropático', 'Neuralgia'], preparation: 'Cápsulas o tintura (consultar médico por interacciones). Aceite tópico para dolores.' },
+  { commonName: 'Ginkgo Biloba', scientificName: 'Ginkgo biloba', ailments: ['Mala memoria', 'Mala circulación cerebral y periférica', 'Tinnitus'], preparation: 'Extracto estandarizado en cápsulas o tabletas. Infusión de hojas secas.' },
+  { commonName: 'Ajo', scientificName: 'Allium sativum', ailments: ['Hipertensión leve', 'Infecciones', 'Mala circulación'], preparation: 'Consumo directo (crudo) o en cápsulas. NO aplicar fresco en piel sensible.' },
+  { commonName: 'Pimienta de Cayena', scientificName: 'Capsicum annuum', ailments: ['Dolor articular', 'Neuropatía periférica', 'Mala circulación'], preparation: 'Crema o parche con capsaicina (tópico). Consumo en dosis mínimas en comida.' },
+  { commonName: 'Hamamelis', scientificName: 'Hamamelis virginiana', ailments: ['Venas varicosas', 'Hinchazón', 'Hemorroides'], preparation: 'Decocción para compresas o aplicación de agua destilada (tópico).' },
+  { commonName: 'Consuelda', scientificName: 'Symphytum officinale', ailments: ['Esguinces', 'Fracturas (uso externo)', 'Dolor articular'], preparation: 'Pomadas o cataplasmas de la raíz (solo uso externo, por toxicidad hepática).' },
+  { commonName: 'Sello de Oro', scientificName: 'Hydrastis canadensis', ailments: ['Infecciones de piel y mucosas', 'Resfriados', 'Digestión'], preparation: 'Tintura o cápsulas (uso limitado y bajo supervisión).' },
+  { commonName: 'Equinácea', scientificName: 'Echinacea purpurea', ailments: ['Refuerzo inmunológico', 'Resfriados', 'Infecciones leves'], preparation: 'Tintura, cápsulas o infusión de la raíz (usar al inicio de los síntomas).' },
+  { commonName: 'Cardo Mariano', scientificName: 'Silybum marianum', ailments: ['Salud hepática', 'Desintoxicación', 'Protección del hígado'], preparation: 'Extracto estandarizado en cápsulas o semillas molidas.' },
+  { commonName: 'Diente de León', scientificName: 'Taraxacum officinale', ailments: ['Retención de líquidos', 'Problemas renales', 'Digestión'], preparation: 'Infusión de hojas (diurético) o decocción de raíz (hepático). Consumo de hojas en ensaladas.' },
+  { commonName: 'Cola de Caballo', scientificName: 'Equisetum arvense', ailments: ['Retención de líquidos', 'Salud ósea', 'Infecciones urinarias'], preparation: 'Infusión de tallos secos. Cápsulas.' },
+  { commonName: 'Avena', scientificName: 'Avena sativa', ailments: ['Estrés', 'Nerviosismo', 'Piel irritada'], preparation: 'Decocción para baños relajantes. Consumo de copos (nutritivo para el sistema nervioso).' },
+  { commonName: 'Pasiflora', scientificName: 'Passiflora incarnata', ailments: ['Insomnio', 'Ansiedad', 'Agitación nerviosa'], preparation: 'Infusión de hojas y flores. Tintura o cápsulas.' },
+  { commonName: 'Regaliz', scientificName: 'Glycyrrhiza glabra', ailments: ['Acidez estomacal', 'Tos', 'Fatiga adrenal'], preparation: 'Decocción de la raíz (usar con precaución en hipertensos). Tópico para eccemas.' },
+  { commonName: 'Ulmaria', scientificName: 'Filipendula ulmaria', ailments: ['Dolor (analgésico)', 'Fiebre', 'Artritis'], preparation: 'Infusión de flores. Sustituto natural de la aspirina (contiene salicilatos).' },
+  { commonName: 'Tomillo', scientificName: 'Thymus vulgaris', ailments: ['Tos', 'Bronquitis', 'Antiséptico'], preparation: 'Infusión (1 cucharadita por taza). Vaporización o gárgaras.' },
+  { commonName: 'Romero', scientificName: 'Salvia rosmarinus', ailments: ['Fatiga mental', 'Mala circulación', 'Dolor muscular'], preparation: 'Infusión para beber o usar en baños de pies. Aceite esencial diluido para masaje.' },
+  { commonName: 'Ortiga', scientificName: 'Urtica dioica', ailments: ['Anemia', 'Artritis', 'Salud renal'], preparation: 'Infusión de hojas secas (rica en minerales). Consumo de hojas cocidas (similar a espinacas).' },
+  { commonName: 'Ginseng', scientificName: 'Panax ginseng', ailments: ['Fatiga crónica', 'Estrés', 'Mejora del rendimiento'], preparation: 'Decocción de la raíz o extracto estandarizado en cápsulas (uso moderado).' },
+  { commonName: 'Fenogreco', scientificName: 'Trigonella foenum-graecum', ailments: ['Mala digestión', 'Apetito', 'Glucosa en sangre'], preparation: 'Semillas germinadas o molidas. Infusión (las semillas son amargas).' },
+];
+
+// Configuración de la API (DEJAR VACÍO: Canvas proporciona la clave)
+const apiKey = "";
+
+// Función de utilidad para manejar la reintentos con backoff
+async function fetchWithBackoff(url: string, options: RequestInit, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        // Retry on 429 (Too Many Requests) or 5xx server errors
+        if (response.status === 429 || response.status >= 500) {
+            throw new Error(`Server error or throttling: status ${response.status}`);
+        }
+        // For other client errors (4xx), stop trying
+        return response;
+      }
+      return response;
+    } catch (error) {
+      if (i < retries - 1) {
+        const delay = Math.pow(2, i) * 1000 + Math.random() * 500;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error('Fetch failed after multiple retries.');
+}
+
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  template: `
+    <div class="flex flex-col h-screen bg-gray-100 text-slate-800 font-sans">
+      <!-- Header -->
+      <header class="bg-[#9AD1C7] text-white p-4 shadow-md z-10">
+        <h1 class="text-2xl font-bold text-center">
+          ReflexApp <span class="text-sm font-light block">Tu Guía de Reflexología Podal by David López</span>
+        </h1>
+      </header>
+
+      <!-- Main Content Area -->
+      <main class="flex-grow overflow-y-auto p-4 pb-20">
+        
+        <!-- 1. PANTALLA DE BIENVENIDA (INICIO) -->
+        <div *ngIf="currentPage() === 'home'" class="max-w-xl mx-auto space-y-6 bg-white p-6 rounded-xl shadow-lg mt-8">
+          <h2 class="text-xl font-semibold text-[#70B9AD] text-center">Asistente de Consulta Inteligente</h2>
+          <p class="text-sm text-gray-600 text-center">
+            Describe tus síntomas. Nuestro asistente identificará las zonas reflejas y te dará recomendaciones.
+          </p>
+
+          <textarea
+            [(ngModel)]="symptomInput"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9AD1C7] focus:border-[#9AD1C7] transition duration-150 text-sm"
+            rows="4"
+            placeholder="Ej: Siento dolor constante en el hombro izquierdo y tengo problemas para dormir por las noches."
+          ></textarea>
+
+          <button
+            (click)="consultAI()"
+            [disabled]="isLoading() || !symptomInput()"
+            class="w-full py-3 rounded-xl font-bold transition duration-300 shadow-md flex items-center justify-center"
+            [ngClass]="{
+              'bg-[#9AD1C7] text-white hover:bg-[#70B9AD]': !isLoading() && symptomInput(),
+              'bg-gray-300 text-gray-500 cursor-not-allowed': isLoading() || !symptomInput()
+            }"
+          >
+            <!-- Lógica de loading corregida -->
+            <ng-container *ngIf="isLoading()">
+              <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Consultando a la IA...
+            </ng-container>
+            <ng-container *ngIf="!isLoading()">
+              Consultar
+            </ng-container>
+          </button>
+        </div>
+
+        <!-- 2. PANTALLA Puntos Reflejos (ANATOMÍA REFLEJA) -->
+        <div *ngIf="currentPage() === 'Puntos Reflejos'" class="max-w-xl mx-auto space-y-6">
+          <h2 class="text-2xl font-semibold text-[#70B9AD] text-center">Mapa Reflexológico por Zonas</h2>
+          <p class="text-sm text-gray-600 text-center">
+            Selecciona un pie para ver la lista completa de sus puntos reflejos. Haz clic en cualquier zona de la lista para ver el detalle.
+          </p>
+
+          <!-- Botones de Selección de Pie -->
+          <div class="flex justify-center space-x-4 mb-6">
+            <button
+              (click)="selectFoot('left')"
+              [ngClass]="{'bg-[#70B9AD] text-white shadow-lg': selectedFoot() === 'left', 'bg-white text-slate-700 border border-gray-300 hover:bg-gray-50': selectedFoot() !== 'left'}"
+              class="flex-1 py-3 rounded-xl font-medium transition duration-200"
+            >
+              Pie Izquierdo
+            </button>
+            <button
+              (click)="selectFoot('right')"
+              [ngClass]="{'bg-[#70B9AD] text-white shadow-lg': selectedFoot() === 'right', 'bg-white text-slate-700 border border-gray-300 hover:bg-gray-50': selectedFoot() !== 'right'}"
+              class="flex-1 py-3 rounded-xl font-medium transition duration-200"
+            >
+              Pie Derecho
+            </button>
+          </div>
+
+          <!-- Columna con la Lista de Zonas Reflejas -->
+          <div class="bg-white p-4 rounded-xl shadow-lg max-h-[500px] overflow-y-auto">
+              <h3 class="text-xl font-semibold text-slate-700 mb-4 border-b pb-2">
+                  Zonas Reflejas del Pie {{ selectedFoot() === 'left' ? 'Izquierdo' : 'Derecho' }}
+              </h3>
+              <ul class="space-y-1">
+                  <li 
+                      *ngFor="let zoneName of getZonesForSelectedFoot(); trackBy: trackByZoneName" 
+                      (click)="openZoneDetailPopup(zoneName)"
+                      class="py-2 px-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 rounded-lg transition duration-150 text-sm font-medium text-slate-700 hover:text-[#70B9AD]"
+                  >
+                      {{ zoneName }}
+                  </li>
+              </ul>
+          </div>
+        </div>
+
+        <!-- 3. PANTALLA TEMARIO REFLEJO -->
+        <div *ngIf="currentPage() === 'syllabus'" class="max-w-3xl mx-auto space-y-6">
+          <!-- ¡Contador corregido a 115! -->
+          <h2 class="text-2xl font-semibold text-[#70B9AD] text-center">Temario de Dolencias Tratables ({{ allAilments.length }} en total)</h2>
+          <p class="text-sm text-gray-600 text-center">
+            Utiliza el filtro para buscar dolencias por nombre o por ruta de tratamiento.
+          </p>
+
+          <!-- Barra de Búsqueda y Filtrado del Temario (NUEVO) -->
+          <div class="bg-white p-4 rounded-xl shadow-lg">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <!-- Búsqueda por Palabra Clave -->
+              <input
+                type="text"
+                [(ngModel)]="syllabusSearchTerm"
+                (ngModelChange)="onSyllabusSearchChange($event)"
+                placeholder="Buscar dolencia o ruta de tratamiento..."
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9AD1C7] focus:border-[#9AD1C7] transition duration-150 text-sm"
+              >
+              
+              <!-- Botón de Orden Alfabético -->
+              <button
+                (click)="toggleSyllabusSortOrder()"
+                class="w-full sm:w-auto px-4 py-3 rounded-lg font-bold transition duration-200 shadow-md flex items-center justify-center text-white"
+                [ngClass]="{
+                  'bg-orange-500 hover:bg-orange-600': syllabusSortOrder() === 'asc',
+                  'bg-orange-700 hover:bg-orange-800': syllabusSortOrder() === 'desc'
+                }"
+              >
+                Ordenar {{ syllabusSortOrder() === 'asc' ? 'Z-A' : 'A-Z' }}
+                <svg *ngIf="syllabusSortOrder() === 'asc'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 ml-2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+                </svg>
+                <svg *ngIf="syllabusSortOrder() === 'desc'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 ml-2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+                </svg>
+              </button>
+
+              <!-- Botón de Reiniciar Filtro -->
+              <button
+                (click)="resetSyllabusFilter()"
+                class="w-full sm:w-auto px-4 py-3 bg-gray-400 text-white rounded-lg font-bold transition duration-200 shadow-md hover:bg-gray-500"
+              >
+                Reiniciar
+              </button>
+            </div>
+          </div>
+          
+          <div class="bg-white p-4 rounded-xl shadow-lg max-h-[60vh] overflow-y-auto">
+            <div *ngFor="let ailment of filteredAilments(); let i = index; trackBy: trackByAilmentName" class="py-3 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 px-3 rounded-lg transition duration-150" (click)="openAilmentPopup(ailment)">
+              <h3 class="text-lg font-medium text-slate-800">{{ ailment.name }}</h3>
+              <p class="text-xs text-gray-500 truncate">
+                Ruta sugerida: {{ ailment.treatmentRoute }}
+              </p>
+            </div>
+             <div *ngIf="filteredAilments().length === 0" class="text-center py-8 text-gray-500">
+              No se encontraron dolencias que coincidan con la búsqueda.
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. PANTALLA HERBOLARIO (HERBOLARIA) -->
+        <div *ngIf="currentPage() === 'techniques'" class="max-w-3xl mx-auto space-y-6">
+          <h2 class="text-2xl font-semibold text-[#70B9AD] text-center">Herbolaria Complementaria: Plantas aliadas de la Reflexología</h2>
+          <p class="text-sm text-gray-600 text-center">
+            La estimulación de los puntos reflejos se potencia con el uso seguro y responsable de estas 30+ plantas. Haz clic para ver el detalle.
+          </p>
+
+          <!-- Barra de Búsqueda y Filtrado -->
+          <div class="bg-white p-4 rounded-xl shadow-lg">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <!-- Búsqueda por Palabra Clave -->
+              <input
+                type="text"
+                [(ngModel)]="herbSearchTerm"
+                (ngModelChange)="onHerbSearchChange($event)"
+                placeholder="Buscar por nombre, científico o dolencia..."
+                class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9AD1C7] focus:border-[#9AD1C7] transition duration-150 text-sm"
+              >
+              
+              <!-- Botón de Orden Alfabético -->
+              <button
+                (click)="toggleHerbSortOrder()"
+                class="w-full sm:w-auto px-4 py-3 rounded-lg font-bold transition duration-200 shadow-md flex items-center justify-center text-white"
+                [ngClass]="{
+                  'bg-orange-500 hover:bg-orange-600': herbSortOrder() === 'asc',
+                  'bg-orange-700 hover:bg-orange-800': herbSortOrder() === 'desc'
+                }"
+              >
+                Ordenar {{ herbSortOrder() === 'asc' ? 'Z-A' : 'A-Z' }}
+                <svg *ngIf="herbSortOrder() === 'asc'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 ml-2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+                </svg>
+                <svg *ngIf="herbSortOrder() === 'desc'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4 ml-2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h14.25M3 9h9.75M3 13.5h5.25m5.25-.75L17.25 9m0 0L21 12.75M17.25 9v12" />
+                </svg>
+              </button>
+
+              <!-- Botón de Reiniciar Filtro -->
+              <button
+                (click)="resetHerbFilter()"
+                class="w-full sm:w-auto px-4 py-3 bg-gray-400 text-white rounded-lg font-bold transition duration-200 shadow-md hover:bg-gray-500"
+              >
+                Reiniciar
+              </button>
+            </div>
+          </div>
+          
+          <!-- Listado de Plantas Filtrado -->
+          <div class="bg-white p-4 rounded-xl shadow-lg max-h-[60vh] overflow-y-auto">
+            <div *ngFor="let herb of filteredHerbs(); trackBy: trackByHerbName" 
+                 (click)="openHerbDetailPopup(herb)"
+                 class="py-3 border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 px-3 rounded-lg transition duration-150"
+            >
+              <h3 class="text-lg font-medium text-slate-800">{{ herb.commonName }} <span class="text-sm italic text-[#70B9AD]">({{ herb.scientificName }})</span></h3>
+              <p class="text-xs text-gray-500 line-clamp-2">
+                Ayuda con: {{ herb.ailments.join(', ') }}
+              </p>
+            </div>
+            
+            <div *ngIf="filteredHerbs().length === 0" class="text-center py-8 text-gray-500">
+              No se encontraron plantas que coincidan con la búsqueda.
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Pop-up Modal (Resultado de IA o Detalle de Puntos) -->
+      <div *ngIf="isPopupOpen()" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col transform transition-transform duration-300 ease-out">
+          <!-- Header del Modal -->
+          <div class="p-4 flex justify-between items-center bg-[#9AD1C7] rounded-t-xl">
+            <h3 class="text-xl font-bold text-white">
+              {{ popupData()?.title || 'Detalle' }}
+            </h3>
+            <button (click)="closePopup()" class="text-white hover:text-gray-200 transition duration-150">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Contenido del Modal -->
+          <div class="p-6 overflow-y-auto flex-grow text-sm space-y-4">
+            <div [innerHTML]="popupData()?.content"></div>
+
+            <!-- Sección de Fuentes (Solo para resultados de IA) -->
+            <div *ngIf="popupData()?.sources && popupData()!.sources.length > 0" class="pt-4 border-t border-gray-100">
+              <h4 class="font-semibold text-slate-700 mb-2">Fuentes Consultadas (IA):</h4>
+              <ul class="list-disc list-inside space-y-1 text-xs text-gray-500">
+                <li *ngFor="let source of popupData()!.sources; let i = index">
+                  <a [href]="source.uri" target="_blank" class="text-blue-500 hover:text-blue-700 underline truncate block" [title]="source.title">
+                    {{ source.title || 'Enlace de fuente' }}
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          <!-- Footer del Modal con Copiar e Imprimir -->
+          <div class="p-4 border-t border-gray-200 flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+            
+            
+            <!-- Botón de Copiar (Guardar) -->
+            <button 
+              (click)="copyResults()"
+              class="py-2 px-4 bg-yellow-500 text-white font-bold rounded-lg hover:bg-yellow-600 transition duration-200 shadow-md flex items-center justify-center text-sm"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 mr-1">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v-3.375A.75.75 0 0 0 15 13.125H9.75A.75.75 0 0 0 9 13.875v3.375m6.75-3.375c0-1.076-.89-1.954-1.98-1.954H10.68A1.985 1.985 0 0 0 8.7 13.125v3.375m6.75-3.375H18M9.75 13.125H6M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM7.5 7.5a1.5 1.5 0 0 1 1.5-1.5h6A1.5 1.5 0 0 1 16.5 7.5v6.75A1.5 1.5 0 0 1 15 15.75h-6A1.5 1.5 0 0 1 7.5 14.25V7.5Z" />
+              </svg>
+              Copiar
+            </button>
+
+            <!-- Botón de Cerrar (Mantenido) -->
+            <button (click)="closePopup()" class="py-2 px-4 bg-[#9AD1C7] text-white font-bold rounded-lg hover:bg-[#70B9AD] transition duration-200 shadow-md text-sm">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Navigation Bar - ORDEN CAMBIADO: INICIO, PUNTOS DE REFLEJO, TEMARIO, TÉCNICAS -->
+      <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-xl z-20">
+        <div class="flex justify-around max-w-xl mx-auto h-16">
+          
+          <!-- BOTÓN INICIO -->
+<button (click)="changePage('home')" class="nav-button" [class.active]="currentPage() === 'home'">
+  <!-- Icono Home (solo líneas, sin relleno) -->
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" 
+       stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+    <path stroke-linecap="round" stroke-linejoin="round" 
+          d="M3 9.75L12 3l9 6.75V21a.75.75 0 01-.75.75H3.75A.75.75 0 013 21V9.75z" />
+    <path stroke-linecap="round" stroke-linejoin="round" 
+          d="M9 21V12h6v9" />
+  </svg>
+  <span class="text-xs">Inicio</span>
+</button>
+<!-- BOTÓN PUNTOS REFLEJOS -->
+<button (click)="changePage('Puntos Reflejos')" class="nav-button" [class.active]="currentPage() === 'Puntos Reflejos'">
+  <!-- Icono Diana de tiro -->
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4" class="w-6 h-6">
+    <!-- Círculo exterior -->
+    <circle cx="50" cy="50" r="45" />
+    <!-- Segundo círculo -->
+    <circle cx="50" cy="50" r="30" />
+    <!-- Círculo interior -->
+    <circle cx="50" cy="50" r="15" />
+    <!-- Flecha simple -->
+    <line x1="70" y1="30" x2="90" y2="10" />
+    <line x1="86" y1="14" x2="90" y2="10" x1="82" y1="18" />
+  </svg>
+  <span class="text-xs">Puntos Reflejos</span>
+</button>
+          <!-- BOTÓN TEMARIO REFLEJO -->
+          <button (click)="changePage('syllabus')" class="nav-button" [class.active]="currentPage() === 'syllabus'">
+            <!-- Icono Temario Reflejo / Lista -->
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12M8.25 17.25h12M4.5 6.75h.008v.008H4.5M4.5 12h.008v.008H4.5M4.5 17.25h.008v.008H4.5" />
+            </svg>
+            <span class="text-xs">Temario Reflejo</span>
+          </button>
+
+          <!-- BOTÓN HERBOLARIO -->
+<button (click)="changePage('techniques')" class="nav-button" [class.active]="currentPage() === 'techniques'">
+  <!-- Icono Herbolario / Planta -->
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-6 h-6">
+    <!-- Tallo -->
+    <path stroke-linecap="round" stroke-linejoin="round" d="M12 21V9" />
+    <!-- Hoja izquierda -->
+    <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 11
+             C9.5 10.5 8 9 7.5 7.2
+             C9.3 7 10.8 7.5 12 9" />
+    <!-- Hoja derecha -->
+    <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 13
+             C14.5 12.5 16 11 16.5 9.2
+             C14.7 9 13.2 9.5 12 11" />
+    <!-- Hoja superior pequeña -->
+    <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9
+             C11 7.8 10.8 6.7 11 5.7
+             C12 5.9 12.7 6.5 13 7.5" />
+  </svg>
+  <span class="text-xs">Herbolario</span>
+</button>
+  `,
+  styles: [`
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    :host {
+      --primary-color: #9AD1C7; /* Color principal (Teal/Menta) */
+      --active-color: #70B9AD; /* Color de activación */
+      --text-color: #334155; /* Slate-700 */
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .nav-button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      flex-grow: 1;
+      color: var(--text-color);
+      transition: color 0.2s, background-color 0.2s;
+    }
+    .nav-button.active {
+      color: var(--active-color);
+      font-weight: 600;
+      border-top: 2px solid var(--active-color);
+    }
+    .nav-button:hover:not(.active) {
+      color: #64748b; /* Slate-500 */
+    }
+
+    .nav-button svg {
+      width: 24px;
+      height: 24px;
+      margin-bottom: 2px;
+    }
+    
+    /* Coherencia estética para el texto en secciones de Herbolario */
+    .whitespace-pre-line {
+      white-space: pre-line;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class App implements OnInit {
+  // --- STATE ---
+  currentPage = signal<'home' | 'Puntos Reflejos' | 'syllabus' | 'techniques'>('syllabus'); // Cambiado a 'syllabus' para la demostración
+  selectedFoot = signal<'left' | 'right'>('left'); 
+  symptomInput = signal('');
+  isLoading = signal(false);
+
+  // --- STATE DE TEMARIO (NUEVO) ---
+  syllabusSearchTerm = signal('');
+  syllabusSortOrder = signal<'asc' | 'desc'>('asc'); 
+
+  // --- STATE DE HERBOLARIA ---
+  herbData = signal<Herb[]>(herbalData);
+  herbSearchTerm = signal('');
+  herbSortOrder = signal<'asc' | 'desc'>('asc'); // 'asc' para A-Z, 'desc' para Z-A
+
+  // Pop-up state
+  popupData = signal<{ title: string; content: string; sources?: { uri: string; title: string }[] } | null>(null);
+  isPopupOpen = signal(false);
+  
+  // Data
+  reflexPoints = signal(reflexologyData);
+  
+  // Obtener y ordenar todas las dolencias (constante inicial)
+  allAilments = [...allAilments]; // ¡Ahora sí, 115 dolencias totales!
+
+  // --- COMPUTED SIGNALS ---
+  
+  // 1. Lógica para filtrar y ordenar las dolencias del TEMARIO
+  filteredAilments = computed(() => {
+    const data = this.allAilments;
+    const term = this.syllabusSearchTerm().toLowerCase();
+    const order = this.syllabusSortOrder();
+
+    let filtered = data;
+
+    // 1. Filtrado por término de búsqueda (nombre o ruta de tratamiento)
+    if (term) {
+      filtered = data.filter(ailment =>
+        ailment.name.toLowerCase().includes(term) ||
+        ailment.treatmentRoute.toLowerCase().includes(term)
+      );
+    }
+
+    // 2. Ordenamiento alfabético por nombre
+    return filtered.sort((a, b) => {
+      if (a.name < b.name) return order === 'asc' ? -1 : 1;
+      if (a.name > b.name) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+  });
+
+  // 2. Devuelve la lista de nombres de zonas para el pie seleccionado (Puntos Reflejos)
+  getZonesForSelectedFoot(): string[] {
+    const foot = this.selectedFoot();
+    const zones = this.reflexPoints()
+      .filter(p => p.footSide === foot || p.footSide === 'both')
+      .map(p => p.zoneName);
+      
+    // Eliminar duplicados y ordenar para claridad
+    return [...new Set(zones)].sort((a, b) => a.localeCompare(b));
+  }
+
+  // 3. Lógica principal para filtrar y ordenar las hierbas (Mantenida)
+  filteredHerbs = computed(() => {
+    const data = this.herbData();
+    const term = this.herbSearchTerm().toLowerCase();
+    const order = this.herbSortOrder();
+
+    let filtered = data;
+
+    // 1. Filtrado por término de búsqueda (nombre común, científico o dolencia)
+    if (term) {
+      filtered = data.filter(herb =>
+        herb.commonName.toLowerCase().includes(term) ||
+        herb.scientificName.toLowerCase().includes(term) ||
+        herb.ailments.some(a => a.toLowerCase().includes(term))
+      );
+    }
+
+    // 2. Ordenamiento alfabético por nombre común
+    return filtered.sort((a, b) => {
+      if (a.commonName < b.commonName) return order === 'asc' ? -1 : 1;
+      if (a.commonName > b.commonName) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+  });
+
+  // --- MÉTODOS DE LA APP ---
+
+  ngOnInit(): void {
+    // Se mantiene
+  }
+
+  // TrackBy functions for *ngFor
+  trackByAilmentName(index: number, item: any): string {
+    return item.name;
+  }
+  
+  trackByZoneName(index: number, item: string): string {
+    return item;
+  }
+
+  trackByHerbName(index: number, item: Herb): string {
+    return item.commonName;
+  }
+
+  // --- NAVEGACIÓN ---
+  changePage(page: 'home' | 'Puntos Reflejos' | 'syllabus' | 'techniques'): void {
+    this.currentPage.set(page);
+  }
+
+  selectFoot(foot: 'left' | 'right'): void {
+    this.selectedFoot.set(foot);
+  }
+
+  // --- MANEJO DE FILTROS DE TEMARIO (NUEVO) ---
+  toggleSyllabusSortOrder(): void {
+    this.syllabusSortOrder.update(current => current === 'asc' ? 'desc' : 'asc');
+  }
+
+  resetSyllabusFilter(): void {
+    this.syllabusSearchTerm.set('');
+    this.syllabusSortOrder.set('asc');
+  }
+
+  onSyllabusSearchChange(term: string): void {
+    this.syllabusSearchTerm.set(term);
+  }
+  
+  // --- MANEJO DE FILTROS DE HERBOLARIA (Modificado el nombre para diferenciar) ---
+  toggleHerbSortOrder(): void {
+    this.herbSortOrder.update(current => current === 'asc' ? 'desc' : 'asc');
+  }
+
+  resetHerbFilter(): void {
+    this.herbSearchTerm.set('');
+    this.herbSortOrder.set('asc');
+  }
+
+  onHerbSearchChange(term: string): void {
+    this.herbSearchTerm.set(term);
+  }
+  
+  // --- MANEJO DE POP-UPS ---
+  closePopup(): void {
+    this.isPopupOpen.set(false);
+    this.popupData.set(null);
+  }
+  
+  // Nuevo método para mostrar confirmaciones temporales
+  showConfirmationPopup(title: string, message: string): void {
+      this.popupData.set({
+          title: title,
+          content: `<p class="text-green-600 font-medium">${message}</p>`,
+          sources: []
+      });
+      this.isPopupOpen.set(true);
+      
+      // Cierra la confirmación de copiado después de 2 segundos.
+      if (title === '¡Copiado!') {
+         setTimeout(() => {
+             this.closePopup();
+         }, 2000);
+      }
+  }
+
+  showErrorPopup(title: string, message: string): void {
+      this.popupData.set({
+          title: title,
+          content: `<p class="text-red-600 font-medium">${message}</p>`,
+          sources: []
+      });
+      this.isPopupOpen.set(true);
+  }
+  
+  // --- NUEVAS FUNCIONES DE UTILIDAD DE EXPORTACIÓN ---
+
+  // Nuevo método para imprimir el contenido del modal
+  printResults(): void {
+    // Llama a la función de impresión del navegador. 
+    // En entornos modernos, esto imprimirá el contenido visible, incluyendo el modal.
+    window.print();
+  }
+
+  // Nuevo método para copiar el contenido de texto (solo texto)
+  copyResults(): void {
+    const data = this.popupData();
+    if (!data) return;
+
+    // 1. Limpiar el HTML para obtener solo el texto.
+    const tempElement = document.createElement('div');
+    tempElement.innerHTML = data.content;
+    const textToCopy = tempElement.textContent || tempElement.innerText || '';
+
+    if (!textToCopy) {
+      this.showErrorPopup('Error al Copiar', 'No hay texto válido para copiar.');
+      return;
+    }
+
+    // 2. Uso de execCommand('copy') (mejor compatibilidad en entornos iframe)
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = textToCopy;
+      textarea.style.position = 'fixed'; 
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      
+      textarea.select();
+      document.execCommand('copy');
+      
+      document.body.removeChild(textarea);
+
+      // Mostrar feedback
+      this.showConfirmationPopup('¡Copiado!', 'El contenido se ha copiado al portapapeles.');
+      
+    } catch (err) {
+      this.showErrorPopup('Error al Copiar', 'Tu navegador no permite la copia automática. Por favor, copia el texto manualmente.');
+      console.error('Copy failed:', err);
+    }
+  }
+  
+  // Fin de las funciones de utilidad.
+
+  // Función para abrir el detalle de la zona reflejada (No modificada)
+  openZoneDetailPopup(zoneName: string): void {
+    const foot = this.selectedFoot();
+    
+    // Buscar la información de la zona. Priorizar la zona específica del pie si existe.
+    const pointData = this.reflexPoints().find(p => p.zoneName === zoneName && (p.footSide === foot || p.footSide === 'both'));
+
+    if (!pointData) {
+        this.showErrorPopup('Información No Encontrada', `No se encontró el detalle para la zona ${zoneName} en el pie ${foot === 'left' ? 'izquierdo' : 'derecho'}.`);
+        return;
+    }
+
+    const ailmentsList = pointData.ailments.map(a => `
+      <div class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <h5 class="font-semibold text-slate-700">${a.name}</h5>
+          <p class="text-xs text-gray-600 mt-1">${a.description}</p>
+      </div>
+    `).join('');
+
+    const content = `
+      <h4 class="text-lg font-bold text-gray-800 mb-2">${pointData.zoneName}</h4>
+      <p class="text-sm italic text-[#70B9AD] font-medium">
+        Ubicación en el Pie ${foot === 'left' ? 'Izquierdo' : 'Derecho'}: <strong>${pointData.reflexLocation}</strong>
+      </p>
+      
+      <div class="mt-4">
+        <h5 class="font-bold text-slate-700 border-b pb-1">Enfermedades y Afecciones que Ayuda a Aliviar:</h5>
+        ${ailmentsList}
+      </div>
+    `;
+
+    this.popupData.set({ title: `Detalle de la Zona Refleja`, content });
+    this.isPopupOpen.set(true);
+  }
+
+  openAilmentPopup(ailment: any): void {
+    const content = `
+      <h4 class="text-lg font-bold text-gray-800 mb-2">${ailment.name}</h4>
+      
+      <div class="mt-3">
+        <h5 class="font-semibold text-[#70B9AD] border-b pb-1">Naturaleza de la Dolencia:</h5>
+        <p class="text-gray-700">${ailment.description}</p>
+      </div>
+
+      <div class="mt-3">
+        <h5 class="font-semibold text-[#70B9AD] border-b pb-1">Ruta de Tratamiento Reflexológico Sugerida:</h5>
+        <p class="text-gray-700 font-medium">${ailment.treatmentRoute}</p>
+      </div>
+    `;
+    this.popupData.set({ title: 'Detalle de la Dolencia', content });
+    this.isPopupOpen.set(true);
+  }
+  
+  // Nueva función para mostrar el detalle de la planta
+  openHerbDetailPopup(herb: Herb): void {
+    const content = `
+      <h4 class="text-xl font-bold text-gray-800 mb-2">${herb.commonName}</h4>
+      <p class="text-sm italic text-[#70B9AD] font-medium mb-4">
+        Nombre Científico: <strong>${herb.scientificName}</strong>
+      </p>
+
+      <div class="mt-4 p-3 bg-indigo-50 rounded-lg">
+        <h5 class="font-bold text-slate-700 border-b pb-1 mb-2">Dolencias que Ayuda a Tratar:</h5>
+        <ul class="list-disc list-inside space-y-1 text-gray-700">
+          ${herb.ailments.map(a => `<li>${a}</li>`).join('')}
+        </ul>
+      </div>
+
+      <div class="mt-4 p-3 bg-green-50 rounded-lg">
+        <h5 class="font-bold text-slate-700 border-b pb-1 mb-2">Forma Segura de Preparación:</h5>
+        <p class="text-gray-700 font-medium">${herb.preparation}</p>
+        <p class="text-xs text-red-600 mt-2"><strong>¡Advertencia!</strong> La herbolaria no sustituye el consejo médico. Consulta siempre a un profesional.</p>
+      </div>
+    `;
+
+    this.popupData.set({ title: `Detalle de la Planta`, content });
+    this.isPopupOpen.set(true);
+  }
+
+  // --- CONSULTA DE IA (API CALL) ---
+  async consultAI(): Promise<void> {
+    if (!this.symptomInput()) return;
+
+    this.isLoading.set(true);
+    // Instrucción detallada para la IA
+    const userQuery = `Analiza el siguiente síntoma o dolencia y proporciona: 1) Las zonas reflejas del pie que deberían ser tratadas, indicando el pie (izquierdo, derecho o ambos) si es relevante. 2) Unas recomendaciones adicionales de bienestar basadas en herbolaria, dieta o ejercicio. Síntoma: "${this.symptomInput()}"`;
+
+    const systemPrompt = "Actúa como un analista experto en reflexología podal y sintetizador de conocimiento médico. Basado en fuentes confiables y de dominio público, genera una respuesta concisa que identifique las zonas reflejas relevantes y proporcione recomendaciones adicionales de salud y bienestar. Responde en español y usa títulos en negrita (**Título**) para las secciones: **Zonas Reflejas Identificadas** y **Recomendaciones Adicionales**.";
+
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+    const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        tools: [{ "google_search": {} }], // Habilitar Google Search para fuentes confiables
+        systemInstruction: {
+            parts: [{ text: systemPrompt }]
+        },
+    };
+
+    try {
+        const response = await fetchWithBackoff(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        const candidate = result.candidates?.[0];
+
+        if (candidate && candidate.content?.parts?.[0]?.text) {
+            // Reemplazar saltos de línea para un formato HTML limpio
+            const text = candidate.content.parts[0].text
+              .replace(/\n\*\*/g, '<br><br><strong class="text-[#70B9AD] text-lg mt-4 block">') // Títulos de sección
+              .replace(/\*\*/g, '</strong>')
+              .replace(/\n\*/g, '<br>*') // Listas
+              .replace(/\n/g, '<br>'); // Otros saltos de línea
+
+            let sources: { uri: string; title: string }[] = [];
+            const groundingMetadata = candidate.groundingMetadata;
+            if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                sources = groundingMetadata.groundingAttributions
+                    .map((attribution: any) => ({
+                        uri: attribution.web?.uri,
+                        title: attribution.web?.title,
+                    }))
+                    .filter((source: any) => source.uri && source.title);
+            }
+
+            this.popupData.set({
+                title: 'Resultado de la Consulta IA',
+                content: text,
+                sources: sources
+            });
+            this.isPopupOpen.set(true);
+        } else {
+            console.error('Error al recibir respuesta de la IA:', result);
+            this.showErrorPopup('Error en la Consulta', 'No se pudo obtener una respuesta válida del asistente de IA. Inténtalo de nuevo.');
+        }
+
+    } catch (error) {
+        console.error('Error en la llamada a la API de Gemini:', error);
+        this.showErrorPopup('Error de Conexión', 'Hubo un problema al contactar al asistente de IA. Verifica tu conexión e intenta más tarde.');
+    } finally {
+        this.isLoading.set(false);
+    }
+  }
+}
+
